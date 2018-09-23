@@ -10,7 +10,6 @@ char *my_strdup(const char *src) { // remember to free s
 }
 
 cmd_t *parse_cmd(char *s) {
-    //redir
     cmd_t *cmd = (cmd_t *)calloc(1, sizeof(cmd_t));
     char *token = NULL;
     int cnt = 0;
@@ -18,8 +17,30 @@ cmd_t *parse_cmd(char *s) {
         if (token[0] != '\0')
             cmd->argv[cnt++] = token;
     }
-    cmd->argv[cnt] = NULL;
 
+    int book = 0;
+
+    for (int i = 0; i < cnt; ++i) {
+        if (strcmp(cmd->argv[i], ">>") == 0) {
+            cmd->flag |= OUT_APPEND;
+            if (cmd->argv[i+1] != NULL)
+                cmd->outfile = cmd->argv[i+1];
+            if (book == 0) book = 1;            
+        }
+        else if (strcmp(cmd->argv[i], ">") == 0) {
+            cmd->flag |= OUT_REDIR;
+            if (cmd->argv[i+1] != NULL)
+                cmd->outfile = cmd->argv[i+1];
+            if (book == 0) book = 1;            
+        }
+        else if (strcmp(cmd->argv[i], "<") == 0) {
+            cmd->flag |= IN_REDIR;
+            if (cmd->argv[i+1] != NULL)
+                cmd->infile = cmd->argv[i+1];
+            if (book == 0) book = 1;
+        }
+        if (book == 1) cmd->argv[i] = NULL; // not necessary
+    }
     return cmd;
 }
 

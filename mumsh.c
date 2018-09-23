@@ -19,7 +19,7 @@ int main() {
         strncpy(s, line, strlen(line)); // backup
 
         pip = parse_pipe(line);
-        
+
         int prev = 0;
         for (int i = 0; i < pip->size; ++i) {
             int fd[2];
@@ -27,6 +27,9 @@ int main() {
             int in = prev, out = fd[1];
             if (i == 0) in = -1;
             if (i == pip->size - 1) out = -1;
+            if (pip->cmds[i]->flag & OUT_APPEND) out = open(pip->cmds[i]->outfile, FLAGS_AP, MODE);
+            if (pip->cmds[i]->flag & OUT_REDIR) out = open(pip->cmds[i]->outfile, FLAGS_WR, MODE);
+            if (pip->cmds[i]->flag & IN_REDIR) in = open(pip->cmds[i]->infile, FLAGS_RD, MODE);
             exec_cmd(pip->cmds[i], in, out);
             prev = fd[0];
         }
