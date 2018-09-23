@@ -12,7 +12,6 @@
 #define MAX_DIR_LEN 256
 
 typedef struct cmd_t {
-    int fd[2];
     char *argv[MAX_LEN];
 } cmd_t;
 
@@ -24,7 +23,7 @@ typedef struct pipe_t{
 cmd_t *parse_cmd(char *);
 pipe_t *parse_pipe(char *);
 int get_pipesize(char *);
-int exec_cmd(cmd_t *);
+int exec_cmd(cmd_t *, int, int);
 int builtin_cmd(cmd_t *);
 void erase_pipe(pipe_t *);
 

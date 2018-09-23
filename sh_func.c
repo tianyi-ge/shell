@@ -20,8 +20,6 @@ cmd_t *parse_cmd(char *s) {
     }
     cmd->argv[cnt] = NULL;
 
-    int i = 0;
-    while (cmd->argv[i]) printf("%s ", cmd->argv[i++]);
     return cmd;
 }
 
@@ -52,9 +50,7 @@ int get_pipesize(char *line) {
     return size;
 }
 
-int exec_cmd(cmd_t *cmd) {
-    if (builtin_cmd(cmd)) return 1;
-    printf("[%s] start---------\n", cmd->argv[0]);
+int exec_cmd(cmd_t *cmd, int in, int out) {
     pid_t pid = fork();
     if (pid == -1) {
         printf("Fork error");
@@ -63,21 +59,23 @@ int exec_cmd(cmd_t *cmd) {
     else if (pid == 0) { // child
         // pipe for the current process
         // if none, stdin or stdout
-        if (cmd->fd[0] != -1) dup2(cmd->fd[0], STDIN_FILENO), close(cmd->fd[0]);
-        if (cmd->fd[1] != -1) dup2(cmd->fd[1], STDOUT_FILENO), close(cmd->fd[1]);
-        printf("[%s] read from: (%d), write to (%d)\n", cmd->argv[0], cmd->fd[0], cmd->fd[1]);
-        // implement the redirection
-        printf("I'm child [%s], my id is (%d)\n",cmd->argv[0],getpid());
+        
+        if (in != -1) dup2(in, STDIN_FILENO);
+        close(in);
+        if (out != 1) dup2(out, STDOUT_FILENO);
+        close(out);
+
+        if(builtin_cmd(cmd)) return 0;
+
         if (execvp(cmd->argv[0], cmd->argv) < 0)
             printf("%s: command not found\n", cmd->argv[0]);
     }
     else {
-        printf("I'm father [%s], my id is (%d)\n",cmd->argv[0], getpid());
+        close(in);
+        close(out);
         int status;
         waitpid(-1, &status, 0);
     }
-    
-    printf("[%s] end************\n", cmd->argv[0]);
     return 0;
 }
 
@@ -86,12 +84,13 @@ int builtin_cmd(cmd_t *cmd) {
         exit(0);
         return 1;
     }
-
+    /*
     if (strcmp(cmd->argv[0], "pwd") == 0) {
         char buf[MAX_DIR_LEN];
         printf("%s\n", getcwd(buf, sizeof(buf)));
         return 1;
     }
+    */
 
     if (strcmp(cmd->argv[0], "cd") == 0) {
         if (cmd->argv[2]) {
@@ -107,5 +106,6 @@ int builtin_cmd(cmd_t *cmd) {
 void erase_pipe(pipe_t *pip) {
     for (int i = 0; i < pip->size; ++i)
         free(pip->cmds[i]);
+    free(pip->cmds);
     free(pip);
 }

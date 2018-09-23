@@ -19,30 +19,18 @@ int main() {
         strncpy(s, line, strlen(line)); // backup
 
         pip = parse_pipe(line);
-
-        int (*fd)[2];
-        if(pip->size > 1) {
-            fd = (int (*)[2])malloc(sizeof(int) * 2 * (pip->size - 1));
-            pip->cmds[0]->fd[0] = -1;
-            pip->cmds[pip->size-1]->fd[1] = -1; //The first read and the last write
-
-            for (int i = 0; i < pip->size-1; ++i) {
-                pipe(fd[i]);
-                pip->cmds[i+1]->fd[0] = fd[i][0];
-                pip->cmds[i]->fd[1] = fd[i][1];
-            }
-
-            for (int i = 0; i < pip->size - 1; ++i)
-                close(fd[i][0]), close(fd[i][1]);
-
-            for (int i = 0; i < pip->size - 1; ++i)
-                printf("%d ==> %d\n", fd[i][1],fd[i][0]);
+        
+        int prev = 0;
+        for (int i = 0; i < pip->size; ++i) {
+            int fd[2];
+            pipe(fd);
+            int in = prev, out = fd[1];
+            if (i == 0) in = -1;
+            if (i == pip->size - 1) out = -1;
+            exec_cmd(pip->cmds[i], in, out);
+            prev = fd[0];
         }
 
-        for (int i = 0; i < pip->size; ++i)
-            exec_cmd(pip->cmds[i]);
-
-        if (pip->size > 1) free(fd);
         erase_pipe(pip);
     }
     return 0;
