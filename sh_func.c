@@ -72,6 +72,7 @@ int get_pipesize(char *line) {
 }
 
 int exec_cmd(cmd_t *cmd, int in, int out) {
+    if(builtin_cmd(cmd)) return 0;
     pid_t pid = fork();
     if (pid == -1) {
         printf("Fork error");
@@ -85,8 +86,6 @@ int exec_cmd(cmd_t *cmd, int in, int out) {
         close(in);
         if (out != 1) dup2(out, STDOUT_FILENO);
         close(out);
-
-        if(builtin_cmd(cmd)) return 0;
 
         if (execvp(cmd->argv[0], cmd->argv) < 0)
             printf("%s: command not found\n", cmd->argv[0]);
@@ -103,7 +102,6 @@ int exec_cmd(cmd_t *cmd, int in, int out) {
 int builtin_cmd(cmd_t *cmd) {
     if (strcmp(cmd->argv[0], "exit") == 0) {
         exit(0);
-        return 1;
     }
     /*
     if (strcmp(cmd->argv[0], "pwd") == 0) {

@@ -33,7 +33,7 @@ int main() {
             exec_cmd(pip->cmds[i], in, out);
             prev = fd[0];
         }
-
+        
         erase_pipe(pip);
     }
     return 0;
