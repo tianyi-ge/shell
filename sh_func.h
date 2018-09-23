@@ -13,18 +13,19 @@
 
 typedef struct cmd_t {
     int fd[2];
-    char *argv[];
+    char *argv[MAX_LEN];
 } cmd_t;
 
 typedef struct pipe_t{
     int size;
-    cmd_t *cmds[];
+    cmd_t **cmds;
 } pipe_t;
 
-cmd_t *parse_cmd(char *line);
-pipe_t *parse_pipe(char *line);
-int get_pipesize(char *line);
-int exec_cmd(cmd_t *cmd);
-int builtin_cmd(cmd_t *cmd);
+cmd_t *parse_cmd(char *);
+pipe_t *parse_pipe(char *);
+int get_pipesize(char *);
+int exec_cmd(cmd_t *);
+int builtin_cmd(cmd_t *);
+void erase_pipe(pipe_t *);
 
 #endif
