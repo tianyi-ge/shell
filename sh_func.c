@@ -101,6 +101,7 @@ int exec_cmd(cmd_t *cmd, int in, int out) {
 
 int builtin_cmd(cmd_t *cmd) {
     if (strcmp(cmd->argv[0], "exit") == 0) {
+        printf("exit\n");
         exit(0);
     }
     /*

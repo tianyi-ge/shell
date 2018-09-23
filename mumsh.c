@@ -35,6 +35,7 @@ int main() {
         }
         
         erase_pipe(pip);
+        break;
     }
     return 0;
 }
