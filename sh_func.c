@@ -9,38 +9,59 @@ char *my_strdup(const char *src) { // remember to free s
     return s;
 }
 
+void sep_redir(char *s) {
+    char backup[MAX_LEN];
+    int i = 0, j = 0;
+    while(s[i] != '\0' && s[i] != '\n') {
+        if (s[i] == '>' && s[i+1] == '>') {
+            backup[j++] = ' ';
+            backup[j++] = '>';
+            backup[j++] = '>';
+            backup[j++] = ' ';
+            i += 2;
+        }
+        else if (s[i] == '>' || s[i] == '<') {
+            backup[j++] = ' ';
+            backup[j++] = s[i++];
+            backup[j++] = ' ';
+        }
+        else {
+            backup[j++] = s[i++];
+        }
+    }
+    for (int k = 0; k < j; ++k) s[k] = backup[k];
+    s[j] = '\0';
+}
+
 cmd_t *parse_cmd(char *s) {
     cmd_t *cmd = (cmd_t *)calloc(1, sizeof(cmd_t));
+    int cnt = 0, size = 0;
+
     char *token = NULL;
-    int cnt = 0;
     for (token = strtok(s, " \t\r\n"); token != NULL; token = strtok(NULL, " \t\r\n")) {
         if (token[0] != '\0')
             cmd->argv[cnt++] = token;
     }
-
-    int book = 0;
-
+    
     for (int i = 0; i < cnt; ++i) {
         if (strcmp(cmd->argv[i], ">>") == 0) {
             cmd->flag |= OUT_APPEND;
             if (cmd->argv[i+1] != NULL)
-                cmd->outfile = cmd->argv[i+1];
-            if (book == 0) book = 1;            
+                cmd->outfile = cmd->argv[++i];
         }
         else if (strcmp(cmd->argv[i], ">") == 0) {
             cmd->flag |= OUT_REDIR;
             if (cmd->argv[i+1] != NULL)
-                cmd->outfile = cmd->argv[i+1];
-            if (book == 0) book = 1;            
+                cmd->outfile = cmd->argv[++i];  
         }
         else if (strcmp(cmd->argv[i], "<") == 0) {
             cmd->flag |= IN_REDIR;
             if (cmd->argv[i+1] != NULL)
-                cmd->infile = cmd->argv[i+1];
-            if (book == 0) book = 1;
+                cmd->infile = cmd->argv[++i];
         }
-        if (book == 1) cmd->argv[i] = NULL; // not necessary
+        else cmd->argv[size++] = cmd->argv[i];
     }
+    cmd->argv[size] = NULL;
     return cmd;
 }
 
@@ -56,7 +77,13 @@ pipe_t *parse_pipe(char *s) {
         if (token[0] != '\0')
             words[cnt++] = token;
     
-    for (int i = 0; i < size; ++i) pip->cmds[i] = parse_cmd(words[i]);
+    for (int i = 0; i < size; ++i){
+        pip->cmds[i] = parse_cmd(words[i]);
+        if (pip->cmds[i]->argv[0] == NULL) {
+            if (i == size-1) pip->emptyFLAG = WT_FLAG; 
+            else pip->emptyFLAG = ER_FLAG;
+        }
+    }
 
     pip->cmds[size] = NULL;
     pip->size = size;

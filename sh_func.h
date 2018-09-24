@@ -21,6 +21,9 @@
 #define FLAGS_RD O_RDONLY | O_CREAT
 #define MODE 0666
 
+#define ER_FLAG 1
+#define WT_FLAG 2 
+
 typedef struct cmd_t {
     int flag;
     char *infile;
@@ -30,9 +33,11 @@ typedef struct cmd_t {
 
 typedef struct pipe_t{
     int size;
+    int emptyFLAG;
     cmd_t **cmds;
 } pipe_t;
 
+void sep_redir(char *);
 cmd_t *parse_cmd(char *);
 pipe_t *parse_pipe(char *);
 int get_pipesize(char *);

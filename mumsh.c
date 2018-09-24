@@ -8,19 +8,31 @@
 
 int main() {
     char line[MAX_LEN], s[MAX_LEN];
-    int len;
     pipe_t *pip;
     while(1) {
         printf("mumsh $ ");
         fflush(stdout);
 
-        if ((len = read(0, line, (size_t)MAX_LEN)) <= 1) continue;     //'\n' counts for 1 character, also ignored
-        line[len-1] = '\0';
+        if (fgets(line, MAX_LEN, stdin) == NULL) continue;
+        sep_redir(line);
         strncpy(s, line, strlen(line)); // backup
-
         pip = parse_pipe(line);
 
         int prev = 0;
+
+        if (pip->emptyFLAG) {
+            if (pip->size == 1) {
+                erase_pipe(pip);
+                continue;
+            }
+            /*
+            else {
+                if (pip->emptyFLAG == ER_FLAG) {//error info}
+                else {//wait}
+            }
+            */
+        }
+
         for (int i = 0; i < pip->size; ++i) {
             int fd[2];
             pipe(fd);
@@ -33,9 +45,7 @@ int main() {
             exec_cmd(pip->cmds[i], in, out);
             prev = fd[0];
         }
-        
         erase_pipe(pip);
-        break;
     }
     return 0;
 }
