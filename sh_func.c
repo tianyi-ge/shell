@@ -8,6 +8,14 @@ char *my_strdup(const char *src) { // remember to free s
     while((*(s++) = *(src++)) != '\0');
     return s;
 }
+void shell_prompt() {
+    printf("mumsh $ ");
+}
+
+void terminate() {
+    printf("exit\n");
+    exit(0);
+}
 
 void sep_redir(char *s) {
     char backup[MAX_LEN];
@@ -101,6 +109,7 @@ int get_pipesize(char *line) {
 int exec_cmd(cmd_t *cmd, int in, int out) {
     if(builtin_cmd(cmd)) return 0;
     pid_t pid = fork();
+    signal(SIGINT, psig_handler);
     if (pid == -1) {
         printf("Fork error");
         return -1;
@@ -128,8 +137,7 @@ int exec_cmd(cmd_t *cmd, int in, int out) {
 
 int builtin_cmd(cmd_t *cmd) {
     if (strcmp(cmd->argv[0], "exit") == 0) {
-        printf("exit\n");
-        exit(0);
+        terminate();
     }
     /*
     if (strcmp(cmd->argv[0], "pwd") == 0) {
@@ -155,4 +163,18 @@ void erase_pipe(pipe_t *pip) {
         free(pip->cmds[i]);
     free(pip->cmds);
     free(pip);
+}
+
+void sig_handler(int sig) {
+    if (sig == SIGINT) {
+        printf("\n");
+        signal(SIGINT, sig_handler);
+    }
+}
+
+void psig_handler(int sig) {
+    if (sig == SIGINT) {
+        printf("\n");
+        signal(SIGINT, psig_handler);
+    }
 }

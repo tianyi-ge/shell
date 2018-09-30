@@ -37,6 +37,8 @@ typedef struct pipe_t{
     cmd_t **cmds;
 } pipe_t;
 
+void shell_prompt();
+void terminate();
 void sep_redir(char *);
 cmd_t *parse_cmd(char *);
 pipe_t *parse_pipe(char *);
@@ -44,5 +46,7 @@ int get_pipesize(char *);
 int exec_cmd(cmd_t *, int, int);
 int builtin_cmd(cmd_t *);
 void erase_pipe(pipe_t *);
+void sig_handler(int);
+void psig_handler(int);
 
 #endif
