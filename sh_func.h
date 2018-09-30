@@ -21,11 +21,16 @@
 #define FLAGS_RD O_RDONLY | O_CREAT
 #define MODE 0666
 
+#define SU_FLAG 0
 #define ER_FLAG 1
 #define WT_FLAG 2 
 
+#define IN_FILE 1
+#define OUT_FILE 2
+
 typedef struct cmd_t {
     int flag;
+    int is_bg;
     char *infile;
     char *outfile;
     char *argv[MAX_LEN];
@@ -39,9 +44,8 @@ typedef struct pipe_t{
 
 void shell_prompt();
 void terminate();
-void sep_redir(char *);
-cmd_t *parse_cmd(char *);
-pipe_t *parse_pipe(char *);
+int parse_cmd(char *, cmd_t **);
+int parse_pipe(char *, pipe_t **);
 int get_pipesize(char *);
 int exec_cmd(cmd_t *, int, int);
 int builtin_cmd(cmd_t *);

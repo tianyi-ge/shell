@@ -12,7 +12,8 @@
 
 int execute(char *line) {
     pipe_t *pip;
-    pip = parse_pipe(line);
+    //int res = parse_pipe(line, &pip);
+    parse_pipe(line, &pip);
     int prev = 0;
     if (pip->emptyFLAG) {
         if (pip->size == 1) {
@@ -50,8 +51,11 @@ int main() {
         shell_prompt();
         fflush(stdout);
         signal(SIGINT, sig_handler);
-        if (fgets(line, MAX_LEN, stdin) == NULL) terminate();
-        sep_redir(line);
+        if (fgets(line, MAX_LEN, stdin) == NULL) {
+            if (!feof(stdin)) continue; //ctrl+c
+            else terminate();
+        }
+
         strncpy(s, line, strlen(line)); // backup
         int flag = execute(line);
         switch (flag) {

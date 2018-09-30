@@ -2,12 +2,6 @@
 #include <string.h>
 #include <stdio.h>
 
-char *my_strdup(const char *src) { // remember to free s
-    if (src == NULL) return NULL;
-    char *s = malloc(strlen(src));
-    while((*(s++) = *(src++)) != '\0');
-    return s;
-}
 void shell_prompt() {
     printf("mumsh $ ");
 }
@@ -17,66 +11,74 @@ void terminate() {
     exit(0);
 }
 
-void sep_redir(char *s) {
-    char backup[MAX_LEN];
-    int i = 0, j = 0;
-    while(s[i] != '\0' && s[i] != '\n') {
-        if (s[i] == '>' && s[i+1] == '>') {
-            backup[j++] = ' ';
-            backup[j++] = '>';
-            backup[j++] = '>';
-            backup[j++] = ' ';
-            i += 2;
+int parse_cmd(char *s, cmd_t **cmd) {
+    *cmd = (cmd_t *)calloc(1, sizeof(cmd_t));
+    int cnt = 0, waitForFile = 0;
+    char *next;
+    char *send = s + strlen(s);
+    while (s < send) {
+        s += strspn(s, " \t\r\n");
+        if (s >= send) break;
+
+        if (*s == '>' && *(s+1) == '>') { //safe to check s+1 because of '\0'
+            (*cmd)->flag |= OUT_APPEND;
+            waitForFile = OUT_FILE;
+            s += 2;
+            continue;
         }
-        else if (s[i] == '>' || s[i] == '<') {
-            backup[j++] = ' ';
-            backup[j++] = s[i++];
-            backup[j++] = ' ';
+        else if (*s == '>') { 
+            (*cmd)->flag |= OUT_REDIR;
+            waitForFile = OUT_FILE;
+            s++;
+            continue;
+        }
+        else if (*s == '<') {
+            (*cmd)->flag |= IN_REDIR;
+            waitForFile = IN_FILE;
+            s++;
+            continue;
+        }
+        else if (*s == '\'' || *s == '\"') {
+            s++;
+            next = strchr(s, *(s-1));
         }
         else {
-            backup[j++] = s[i++];
+            next = s + strcspn(s, " \t\r\n");
         }
+
+        if (next == NULL) {
+            //wait for parenthese input
+        }
+        *next = '\0';
+        if (waitForFile == IN_FILE) {
+            (*cmd)->infile = s;
+            waitForFile = 0;
+        }
+        else if (waitForFile == OUT_FILE) {
+            (*cmd)->outfile = s;
+            waitForFile = 0;
+        }
+        else {
+            (*cmd)->argv[cnt++] = s;
+        }
+        s = next + 1;
     }
-    for (int k = 0; k < j; ++k) s[k] = backup[k];
-    s[j] = '\0';
+    if (waitForFile) {
+        //no file, error 
+    }
+    (*cmd)->argv[cnt] = NULL;
+    if ((*cmd)->argv[cnt-1][0] == '&') {
+        (*cmd)->is_bg = 1;
+        (*cmd)->argv[--cnt] = NULL;
+    }
+
+    return SU_FLAG;
 }
 
-cmd_t *parse_cmd(char *s) {
-    cmd_t *cmd = (cmd_t *)calloc(1, sizeof(cmd_t));
-    int cnt = 0, size = 0;
-
-    char *token = NULL;
-    for (token = strtok(s, " \t\r\n"); token != NULL; token = strtok(NULL, " \t\r\n")) {
-        if (token[0] != '\0')
-            cmd->argv[cnt++] = token;
-    }
-    
-    for (int i = 0; i < cnt; ++i) {
-        if (strcmp(cmd->argv[i], ">>") == 0) {
-            cmd->flag |= OUT_APPEND;
-            if (cmd->argv[i+1] != NULL)
-                cmd->outfile = cmd->argv[++i];
-        }
-        else if (strcmp(cmd->argv[i], ">") == 0) {
-            cmd->flag |= OUT_REDIR;
-            if (cmd->argv[i+1] != NULL)
-                cmd->outfile = cmd->argv[++i];  
-        }
-        else if (strcmp(cmd->argv[i], "<") == 0) {
-            cmd->flag |= IN_REDIR;
-            if (cmd->argv[i+1] != NULL)
-                cmd->infile = cmd->argv[++i];
-        }
-        else cmd->argv[size++] = cmd->argv[i];
-    }
-    cmd->argv[size] = NULL;
-    return cmd;
-}
-
-pipe_t *parse_pipe(char *s) {
+int parse_pipe(char *s, pipe_t **pip) {
     int size = get_pipesize(s) + 1;
-    pipe_t *pip = (pipe_t *)calloc(1, sizeof(pipe_t));
-    pip->cmds = (cmd_t **)calloc(size+1, sizeof(cmd_t *));
+    *pip = (pipe_t *)calloc(1, sizeof(pipe_t));
+    (*pip)->cmds = (cmd_t **)calloc(size+1, sizeof(cmd_t *));
 
     char *token = NULL;
     char *words[MAX_LEN];
@@ -86,17 +88,18 @@ pipe_t *parse_pipe(char *s) {
             words[cnt++] = token;
     
     for (int i = 0; i < size; ++i){
-        pip->cmds[i] = parse_cmd(words[i]);
-        if (pip->cmds[i]->argv[0] == NULL) {
-            if (i == size-1) pip->emptyFLAG = WT_FLAG; 
-            else pip->emptyFLAG = ER_FLAG;
+        //int res = parse_cmd(words[i], &(*pip)->cmds[i]);
+        parse_cmd(words[i], &(*pip)->cmds[i]);
+        if ((*pip)->cmds[i]->argv[0] == NULL) {
+            if (i == size-1) (*pip)->emptyFLAG = WT_FLAG; 
+            else (*pip)->emptyFLAG = ER_FLAG;
         }
     }
 
-    pip->cmds[size] = NULL;
-    pip->size = size;
+    (*pip)->cmds[size] = NULL;
+    (*pip)->size = size;
 
-    return pip;
+    return SU_FLAG;
 }
 
 int get_pipesize(char *line) {
