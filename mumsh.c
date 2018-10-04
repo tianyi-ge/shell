@@ -12,6 +12,7 @@
 
 int execute(char *line) {
     pipe_t *pip;
+    int id[MAX_LEN>>2];
     //int res = parse_pipe(line, &pip);
     parse_pipe(line, &pip);
     int prev = 0;
@@ -38,9 +39,14 @@ int execute(char *line) {
         if (pip->cmds[i]->flag & OUT_APPEND) out = open(pip->cmds[i]->outfile, FLAGS_AP, MODE);
         if (pip->cmds[i]->flag & OUT_REDIR) out = open(pip->cmds[i]->outfile, FLAGS_WR, MODE);
         if (pip->cmds[i]->flag & IN_REDIR) in = open(pip->cmds[i]->infile, FLAGS_RD, MODE);
-        exec_cmd(pip->cmds[i], in, out);
+        id[i] = exec_cmd(pip->cmds[i], in, out);
         prev = fd[0];
     }
+    int status;
+    for (int i = 0; i < pip->size; ++i)
+        if (id[i] > 0)
+            waitpid(id[i], &status, 0);
+    
     erase_pipe(pip);
     return SUCCESS_CMD;
 }

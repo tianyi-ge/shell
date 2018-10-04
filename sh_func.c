@@ -162,11 +162,8 @@ int exec_cmd(cmd_t *cmd, int in, int out) {
     else {
         close(in);
         close(out);
-        int status;
-        waitpid(pid, &status, 0);
-        printf("%s\n",cmd->argv[0]);
     }
-    return 0;
+    return pid;
 }
 
 int builtin_cmd(cmd_t *cmd) {
