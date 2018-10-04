@@ -48,15 +48,16 @@ int execute(char *line) {
 int main() {
     char line[MAX_LEN], s[MAX_LEN];
     while (1) {
+        memset(line, 0, sizeof(line));
+        memset(s, 0, sizeof(s));
         shell_prompt();
-        fflush(stdout);
         signal(SIGINT, sig_handler);
         if (fgets(line, MAX_LEN, stdin) == NULL) {
-            if (!feof(stdin)) continue; //ctrl+c
-            else terminate();
+            if (feof(stdin)) terminate();
+            else continue;
         }
-
         strncpy(s, line, strlen(line)); // backup
+        sep_redir(line);
         int flag = execute(line);
         switch (flag) {
             case EMPTY_CMD: continue;

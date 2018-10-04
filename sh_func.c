@@ -4,11 +4,39 @@
 
 void shell_prompt() {
     printf("mumsh $ ");
+    fflush(stdout);
 }
 
 void terminate() {
     printf("exit\n");
     exit(0);
+}
+
+void sep_redir(char *s) {
+    char backup[MAX_LEN];
+    int i = 0, j = 0, flag_single = 0, flag_double = 0;
+    while(s[i] != '\0') {
+        if (flag_single || flag_double) {backup[j++] = s[i++]; continue;} // unfinished quotes
+        if (s[i] == '>' && s[i+1] == '>') {
+            backup[j++] = ' ';
+            backup[j++] = '>';
+            backup[j++] = '>';
+            backup[j++] = ' ';
+            i += 2;
+        }
+        else if (s[i] == '>' || s[i] == '<') {
+            backup[j++] = ' ';
+            backup[j++] = s[i++];
+            backup[j++] = ' ';
+        }
+        else {
+            if (s[i] == '\'') flag_single ^= 1;
+            if (s[i] == '\"') flag_double ^= 1;
+            backup[j++] = s[i++];
+        }
+    }
+    for (int k = 0; k < j; ++k) s[k] = backup[k];
+    s[j] = '\0';
 }
 
 int parse_cmd(char *s, cmd_t **cmd) {
@@ -46,7 +74,7 @@ int parse_cmd(char *s, cmd_t **cmd) {
             next = s + strcspn(s, " \t\r\n");
         }
 
-        if (next == NULL) {
+        if (next == NULL) { 
             //wait for parenthese input
         }
         *next = '\0';
@@ -67,7 +95,7 @@ int parse_cmd(char *s, cmd_t **cmd) {
         //no file, error 
     }
     (*cmd)->argv[cnt] = NULL;
-    if ((*cmd)->argv[cnt-1][0] == '&') {
+    if (cnt > 0 && (*cmd)->argv[cnt-1][0] == '&') {
         (*cmd)->is_bg = 1;
         (*cmd)->argv[--cnt] = NULL;
     }
@@ -126,14 +154,17 @@ int exec_cmd(cmd_t *cmd, int in, int out) {
         if (out != 1) dup2(out, STDOUT_FILENO);
         close(out);
 
-        if (execvp(cmd->argv[0], cmd->argv) < 0)
+        if (execvp(cmd->argv[0], cmd->argv) < 0) {
             printf("%s: command not found\n", cmd->argv[0]);
+            exit(0);
+        }
     }
     else {
         close(in);
         close(out);
         int status;
-        waitpid(-1, &status, 0);
+        waitpid(pid, &status, 0);
+        printf("%s\n",cmd->argv[0]);
     }
     return 0;
 }
@@ -171,6 +202,7 @@ void erase_pipe(pipe_t *pip) {
 void sig_handler(int sig) {
     if (sig == SIGINT) {
         printf("\n");
+        shell_prompt();
         signal(SIGINT, sig_handler);
     }
 }

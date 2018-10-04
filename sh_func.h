@@ -42,6 +42,7 @@ typedef struct pipe_t{
     cmd_t **cmds;
 } pipe_t;
 
+void sep_redir(char *);
 void shell_prompt();
 void terminate();
 int parse_cmd(char *, cmd_t **);
