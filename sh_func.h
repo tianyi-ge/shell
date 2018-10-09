@@ -30,7 +30,7 @@
 #define OUT_FILE 2
 
 #define DONE 0
-#define RUNNING 0
+#define RUNNING 1
 
 typedef struct cmd_t {
     int flag;

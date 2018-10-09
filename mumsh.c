@@ -22,7 +22,7 @@ int execute(char *line) {
             pipe_error(); return ER_FLAG;
         }
     }
-
+    jobs[jobcnt].status = RUNNING;
     for (int i = 0; i < pip->size; ++i) {
         int fd[2];
         pipe(fd);
