@@ -21,10 +21,15 @@ int execute(char *line) {
             erase_pipe(pip);
             return EMPTY_CMD;
         }
-        /*
+        /* should not happen
         else {
-            if (pip->emptyFLAG == ER_FLAG) {//error info}
-            else {//wait}
+            if (pip->emptyFLAG == ER_FLAG) {
+                erase_pipe(pip);
+                return ERROR_CMD;
+            }
+            else {
+
+            }
         }
         */
     }
@@ -53,6 +58,7 @@ int execute(char *line) {
 
 int main() {
     char line[MAX_LEN], s[MAX_LEN];
+    int res;
     while (1) {
         memset(line, 0, sizeof(line));
         memset(s, 0, sizeof(s));
@@ -64,6 +70,20 @@ int main() {
         }
         strncpy(s, line, strlen(line)); // backup
         sep_redir(line);
+        while ((res = not_finished(line)) == 1) {
+            printf("> ");
+            fflush(stdout);
+            if (fgets(line, MAX_LEN, stdin) == NULL) break;
+            
+            strcat(s, line); // append new line to backup string s
+            sep_redir(s);  // seperate < and >
+            strncpy(line, s, strlen(s)); // copy s to line
+        }
+        if (res == -1) { // wait for file error
+            printf("mumsh: syntax error near unexpected token `|'\n");
+            continue;
+        }
+        
         int flag = execute(line);
         switch (flag) {
             case EMPTY_CMD: continue;

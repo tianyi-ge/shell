@@ -42,14 +42,15 @@ typedef struct pipe_t{
     cmd_t **cmds;
 } pipe_t;
 
+int  not_finished(char *);
 void sep_redir(char *);
 void shell_prompt();
 void terminate();
-int parse_cmd(char *, cmd_t **);
-int parse_pipe(char *, pipe_t **);
-int get_pipesize(char *);
-int exec_cmd(cmd_t *, int, int);
-int builtin_cmd(cmd_t *);
+int  parse_cmd(char *, cmd_t **);
+int  parse_pipe(char *, pipe_t **);
+int  get_pipesize(char *);
+int  exec_cmd(cmd_t *, int, int);
+int  builtin_cmd(cmd_t *);
 void erase_pipe(pipe_t *);
 void sig_handler(int);
 void psig_handler(int);

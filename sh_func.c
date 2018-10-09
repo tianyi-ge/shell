@@ -12,9 +12,53 @@ void terminate() {
     exit(0);
 }
 
+int not_finished(char *s) {
+    int waitForFile = 0, waitForPipe = 0;
+    char *send = s + strlen(s), *next;
+    while (s < send) {
+        s += strspn(s, " \t\r\n");
+        if (s >= send) break;
+
+        if (*s == '>' && *(s+1) == '>') { //safe to check s+1 because of '\0'
+            waitForFile = 1;
+            s += 2;
+            continue;
+        }
+        else if (*s == '>' || *s == '<') {
+            waitForFile = 1;
+            s++;
+            continue;
+        }
+        else if (*s == '\'' || *s == '\"') {
+            s++;
+            next = strchr(s, *(s-1));
+        }
+        else if (*s == '|'){
+            if (waitForFile) return -1; // error
+            waitForPipe = 1;
+            s++;
+            continue;
+        }
+        else {
+            next = s + strcspn(s, " \t\r\n");
+        }
+
+        if (next == NULL) { //wait for parenthese input
+            return 1;
+        }
+        waitForFile = 0; // if reaches here, must be valid
+        waitForPipe = 0;
+        s = next + 1;
+    }
+    if (waitForFile || waitForPipe) return 1;
+
+    return 0;
+}
+
 void sep_redir(char *s) {
     char backup[MAX_LEN];
     int i = 0, j = 0, flag_single = 0, flag_double = 0;
+    if (s[strlen(s) - 1] == '\n') s[strlen(s) - 1] = '\0'; //get rid of the last '\n'
     while(s[i] != '\0') {
         if (flag_single || flag_double) {backup[j++] = s[i++]; continue;} // unfinished quotes
         if (s[i] == '>' && s[i+1] == '>') {
@@ -24,7 +68,7 @@ void sep_redir(char *s) {
             backup[j++] = ' ';
             i += 2;
         }
-        else if (s[i] == '>' || s[i] == '<') {
+        else if (s[i] == '>' || s[i] == '<' || s[i] == '|') {
             backup[j++] = ' ';
             backup[j++] = s[i++];
             backup[j++] = ' ';
@@ -76,6 +120,7 @@ int parse_cmd(char *s, cmd_t **cmd) {
 
         if (next == NULL) { 
             //wait for parenthese input
+            return WT_FLAG;
         }
         *next = '\0';
         if (waitForFile == IN_FILE) {
@@ -92,7 +137,8 @@ int parse_cmd(char *s, cmd_t **cmd) {
         s = next + 1;
     }
     if (waitForFile) {
-        //no file, error 
+        //no file, error
+        return WT_FLAG;
     }
     (*cmd)->argv[cnt] = NULL;
     if (cnt > 0 && (*cmd)->argv[cnt-1][0] == '&') {
