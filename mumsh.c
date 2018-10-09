@@ -6,9 +6,13 @@
 #include <unistd.h>
 #include "sh_func.h"
 
+extern job_t jobs[MAX_JOBS];
+extern int jobcnt;
+
 int execute(char *line) {
+    job_t *job = &jobs[jobcnt];
     pipe_t *pip;
-    int id[MAX_LEN>>2];
+    int *pid = job->pid; // pointer to pid array
     int res = parse_pipe(line, &pip);
     int prev = 0;
     if (res != SU_FLAG) {
@@ -18,6 +22,7 @@ int execute(char *line) {
             pipe_error(); return ER_FLAG;
         }
     }
+
     for (int i = 0; i < pip->size; ++i) {
         int fd[2];
         pipe(fd);
@@ -29,53 +34,55 @@ int execute(char *line) {
         if (pip->cmds[i]->flag & OUT_APPEND) out = open(pip->cmds[i]->outfile, FLAGS_AP, MODE);
         if (pip->cmds[i]->flag & OUT_REDIR) out = open(pip->cmds[i]->outfile, FLAGS_WR, MODE);
         if (pip->cmds[i]->flag & IN_REDIR) in = open(pip->cmds[i]->infile, FLAGS_RD, MODE);
-        id[i] = exec_cmd(pip->cmds[i], in, out);
+        pid[i] = exec_cmd(pip->cmds[i], in, out);
         prev = fd[0];
     }
-    int status;
-    for (int i = 0; i < pip->size; ++i) {
-        if (id[i] > 0)
-            waitpid(id[i], &status, 0);
-    }
+    job->pcnt = pip->size;
+    if (pip->is_bg) print_job(jobcnt++); // valid background job. Otherwise it'll be overwitten next time.
     
+    if (!pip->is_bg) {
+        int status;
+        for (int i = 0; i < pip->size; ++i) {
+            if (pid[i] > 0)
+                waitpid(pid[i], &status, 0);
+        }
+    }
     erase_pipe(pip);
     return SU_FLAG;
 }
 
 int main() {
-    job_t jobs[MAX_JOBS];
     char line[MAX_LEN], s[MAX_LEN];
-    char *b = NULL;
-    int res, jobcnt = 0;
+    int res;
     while (1) {
-        b = jobs[jobcnt].name;
         memset(line, 0, sizeof(line));
         memset(s, 0, sizeof(s));
-        // memset(b, 0, sizeof(b));
         shell_prompt();
         signal(SIGINT, sig_handler);
         if (fgets(line, MAX_LEN, stdin) == NULL) {
             if (feof(stdin)) terminate();
             else continue;
         }
-        strncpy(b, line, strlen(line)); // backup
+        strncpy(jobs[jobcnt].name, line, strlen(line)); // backup
         strncpy(s, line, strlen(line)); // ready for unfinished command
         sep_redir(line);
         while ((res = not_finished(line)) == 1) {
             printf("> ");
             fflush(stdout);
             if (fgets(line, MAX_LEN, stdin) == NULL) break;
-            strcat(b, line); // keep the original string
+            strcat(jobs[jobcnt].name, line); // keep the original string
             strcat(s, line); // append new line to backup string s
             sep_redir(s);  // seperate < and >
             strncpy(line, s, strlen(s)); // copy s to line
         }
+        
         if (res == -1) { // pipe error
             pipe_error();
             continue;
         }
         
         int flag = execute(line);
+
         switch (flag) {
             case SU_FLAG: break;
             case EM_FLAG: break;

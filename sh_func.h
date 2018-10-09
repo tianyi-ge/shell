@@ -29,6 +29,9 @@
 #define IN_FILE 1
 #define OUT_FILE 2
 
+#define DONE 0
+#define RUNNING 0
+
 typedef struct cmd_t {
     int flag;
     char *infile;
@@ -43,8 +46,10 @@ typedef struct pipe_t {
 } pipe_t;
 
 typedef struct job_t {
-    int pid;
+    int pid[MAX_LEN>>4]; // 64
+    int pcnt;
     char name[MAX_LEN];
+    int status;
 } job_t;
 
 void shell_prompt();
@@ -60,6 +65,7 @@ int  builtin_cmd(cmd_t *);
 void erase_pipe(pipe_t *);
 void sig_handler(int);
 void psig_handler(int);
-//void print_job(job_t []);
+void print_job(int);
+void print_job_status(int);
 
 #endif

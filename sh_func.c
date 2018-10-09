@@ -2,6 +2,9 @@
 #include <string.h>
 #include <stdio.h>
 
+job_t jobs[MAX_JOBS];
+int jobcnt = 1;
+
 void shell_prompt() {
     printf("mumsh $ ");
     fflush(stdout);
@@ -73,7 +76,7 @@ void sep_redir(char *s) {
             backup[j++] = ' ';
             i += 2;
         }
-        else if (s[i] == '>' || s[i] == '<' || s[i] == '|') {
+        else if (s[i] == '>' || s[i] == '<' || s[i] == '|' || s[i] == '&') {
             backup[j++] = ' ';
             backup[j++] = s[i++];
             backup[j++] = ' ';
@@ -234,6 +237,13 @@ int builtin_cmd(cmd_t *cmd) {
     }
     */
 
+   if (strcmp(cmd->argv[0], "jobs") == 0) {
+        for (int i = 1; i < jobcnt; ++i) {
+            print_job_status(i);
+       }
+       return 1;
+   }
+
     if (strcmp(cmd->argv[0], "cd") == 0) {
         if (cmd->argv[2]) {
             printf("mumsh: cd: too many arguments\n");
@@ -266,8 +276,34 @@ void psig_handler(int sig) {
         signal(SIGINT, psig_handler);
     }
 }
-/*
-void print_job(job_t jobs[]) {
 
+void print_job(int jid) {
+    printf("[%d] ", jid);
+    for (int i = 0; i < jobs[jid].pcnt; ++i)
+        printf("(%d) ", jobs[jid].pid[i]);
+    printf("%s", jobs[jid].name);
 }
-*/
+
+void print_job_status(int jid) {
+    printf("[%d] ", jid);
+    if (jobs[jid].status == DONE) {
+        printf("done ");
+    }
+    else {
+        int done = 1;
+        for (int j = 0; j < jobs[jid].pcnt; ++j)
+            if (jobs[jid].pid[j] > 0)
+                if (waitpid(jobs[jid].pid[j], NULL, WNOHANG) == 0)
+                    done = 0; // running
+        
+        if (done == 0) {
+            jobs[jid].status = RUNNING;
+            printf("running ");
+        }
+        else {
+            jobs[jid].status = DONE;
+            printf("done ");
+        }
+    }
+    printf("%s", jobs[jid].name);
+}
