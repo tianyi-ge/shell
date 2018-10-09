@@ -6,32 +6,17 @@
 #include <unistd.h>
 #include "sh_func.h"
 
-#define ERROR_CMD -1
-#define EMPTY_CMD 0
-#define SUCCESS_CMD 1
-
 int execute(char *line) {
     pipe_t *pip;
     int id[MAX_LEN>>2];
-    //int res = parse_pipe(line, &pip);
-    parse_pipe(line, &pip);
+    int res = parse_pipe(line, &pip);
     int prev = 0;
-    if (pip->emptyFLAG) {
-        if (pip->size == 1) {
-            erase_pipe(pip);
-            return EMPTY_CMD;
+    if (res != SU_FLAG) {
+        erase_pipe(pip);
+        if (res == EM_FLAG) return EM_FLAG;
+        else { // ER_FLAG
+            pipe_error(); return ER_FLAG;
         }
-        /* should not happen
-        else {
-            if (pip->emptyFLAG == ER_FLAG) {
-                erase_pipe(pip);
-                return ERROR_CMD;
-            }
-            else {
-
-            }
-        }
-        */
     }
     for (int i = 0; i < pip->size; ++i) {
         int fd[2];
@@ -48,48 +33,54 @@ int execute(char *line) {
         prev = fd[0];
     }
     int status;
-    for (int i = 0; i < pip->size; ++i)
+    for (int i = 0; i < pip->size; ++i) {
         if (id[i] > 0)
             waitpid(id[i], &status, 0);
+    }
     
     erase_pipe(pip);
-    return SUCCESS_CMD;
+    return SU_FLAG;
 }
 
 int main() {
+    job_t jobs[MAX_JOBS];
     char line[MAX_LEN], s[MAX_LEN];
-    int res;
+    char *b = NULL;
+    int res, jobcnt = 0;
     while (1) {
+        b = jobs[jobcnt].name;
         memset(line, 0, sizeof(line));
         memset(s, 0, sizeof(s));
+        // memset(b, 0, sizeof(b));
         shell_prompt();
         signal(SIGINT, sig_handler);
         if (fgets(line, MAX_LEN, stdin) == NULL) {
             if (feof(stdin)) terminate();
             else continue;
         }
-        strncpy(s, line, strlen(line)); // backup
+        strncpy(b, line, strlen(line)); // backup
+        strncpy(s, line, strlen(line)); // ready for unfinished command
         sep_redir(line);
         while ((res = not_finished(line)) == 1) {
             printf("> ");
             fflush(stdout);
             if (fgets(line, MAX_LEN, stdin) == NULL) break;
-            
+            strcat(b, line); // keep the original string
             strcat(s, line); // append new line to backup string s
             sep_redir(s);  // seperate < and >
             strncpy(line, s, strlen(s)); // copy s to line
         }
-        if (res == -1) { // wait for file error
-            printf("mumsh: syntax error near unexpected token `|'\n");
+        if (res == -1) { // pipe error
+            pipe_error();
             continue;
         }
         
         int flag = execute(line);
         switch (flag) {
-            case EMPTY_CMD: continue;
-            case ERROR_CMD: continue;
-            case SUCCESS_CMD: continue;
-            default: continue;
+            case SU_FLAG: break;
+            case EM_FLAG: break;
+            case ER_FLAG: break;
+            default: break;
         }
     }
     return 0;

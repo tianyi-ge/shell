@@ -12,8 +12,12 @@ void terminate() {
     exit(0);
 }
 
+void pipe_error() {
+    printf("mumsh: syntax error near unexpected token `|'\n");
+}
+
 int not_finished(char *s) {
-    int waitForFile = 0, waitForPipe = 0;
+    int waitForFile = 0, waitForPipe = -1;
     char *send = s + strlen(s), *next;
     while (s < send) {
         s += strspn(s, " \t\r\n");
@@ -35,6 +39,7 @@ int not_finished(char *s) {
         }
         else if (*s == '|'){
             if (waitForFile) return -1; // error
+            if (waitForPipe) return -1; // error
             waitForPipe = 1;
             s++;
             continue;
@@ -50,7 +55,7 @@ int not_finished(char *s) {
         waitForPipe = 0;
         s = next + 1;
     }
-    if (waitForFile || waitForPipe) return 1;
+    if (waitForFile || waitForPipe == 1) return 1;
 
     return 0;
 }
@@ -120,7 +125,7 @@ int parse_cmd(char *s, cmd_t **cmd) {
 
         if (next == NULL) { 
             //wait for parenthese input
-            return WT_FLAG;
+            return 0;
         }
         *next = '\0';
         if (waitForFile == IN_FILE) {
@@ -138,41 +143,46 @@ int parse_cmd(char *s, cmd_t **cmd) {
     }
     if (waitForFile) {
         //no file, error
-        return WT_FLAG;
+        return 0;
     }
     (*cmd)->argv[cnt] = NULL;
     if (cnt > 0 && (*cmd)->argv[cnt-1][0] == '&') {
-        (*cmd)->is_bg = 1;
         (*cmd)->argv[--cnt] = NULL;
+        return 1;
     }
-
-    return SU_FLAG;
+    return 0;
 }
 
 int parse_pipe(char *s, pipe_t **pip) {
     int size = get_pipesize(s) + 1;
     *pip = (pipe_t *)calloc(1, sizeof(pipe_t));
     (*pip)->cmds = (cmd_t **)calloc(size+1, sizeof(cmd_t *));
-
-    char *token = NULL;
-    char *words[MAX_LEN];
-    int cnt = 0;
-    for (token = strtok(s, "|"); token != NULL; token = strtok(NULL, "|"))
-        if (token[0] != '\0')
-            words[cnt++] = token;
-    
-    for (int i = 0; i < size; ++i){
-        //int res = parse_cmd(words[i], &(*pip)->cmds[i]);
-        parse_cmd(words[i], &(*pip)->cmds[i]);
-        if ((*pip)->cmds[i]->argv[0] == NULL) {
-            if (i == size-1) (*pip)->emptyFLAG = WT_FLAG; 
-            else (*pip)->emptyFLAG = ER_FLAG;
-        }
-    }
-
     (*pip)->cmds[size] = NULL;
     (*pip)->size = size;
 
+    //char *token = NULL;
+    char *words[MAX_LEN];
+    int cnt = 0;
+    //for (token = strtok(s, "|"); token != NULL; token = strtok(NULL, "|")) {printf("[!]\n");words[cnt++] = token;}
+    
+    char *send = s + strlen(s);
+    char *next = NULL;
+    do {
+        next = s + strcspn(s, "|");
+        *next = '\0';
+        words[cnt++] = s;
+        s = next + 1;
+    } while (s < send);
+
+    int is_bg = 0;
+    for (int i = 0; i < size; ++i){
+        is_bg = parse_cmd(words[i], &(*pip)->cmds[i]);
+        if ((*pip)->cmds[i]->argv[0] == NULL) {
+            if (i == 0 && size == 1)  return EM_FLAG; // empty command
+            else return ER_FLAG; // empty command in the middle
+        }
+    }
+    (*pip)->is_bg = is_bg;
     return SU_FLAG;
 }
 
@@ -256,3 +266,8 @@ void psig_handler(int sig) {
         signal(SIGINT, psig_handler);
     }
 }
+/*
+void print_job(job_t jobs[]) {
+
+}
+*/

@@ -12,6 +12,7 @@
 
 #define MAX_LEN 1024
 #define MAX_DIR_LEN 256
+#define MAX_JOBS 20
 
 #define IN_REDIR 1
 #define OUT_REDIR 2
@@ -23,29 +24,34 @@
 
 #define SU_FLAG 0
 #define ER_FLAG 1
-#define WT_FLAG 2 
+#define EM_FLAG 2 
 
 #define IN_FILE 1
 #define OUT_FILE 2
 
 typedef struct cmd_t {
     int flag;
-    int is_bg;
     char *infile;
     char *outfile;
     char *argv[MAX_LEN];
 } cmd_t;
 
-typedef struct pipe_t{
+typedef struct pipe_t {
     int size;
-    int emptyFLAG;
+    int is_bg;
     cmd_t **cmds;
 } pipe_t;
 
-int  not_finished(char *);
-void sep_redir(char *);
+typedef struct job_t {
+    int pid;
+    char name[MAX_LEN];
+} job_t;
+
 void shell_prompt();
 void terminate();
+void pipe_error();
+int  not_finished(char *);
+void sep_redir(char *);
 int  parse_cmd(char *, cmd_t **);
 int  parse_pipe(char *, pipe_t **);
 int  get_pipesize(char *);
@@ -54,5 +60,6 @@ int  builtin_cmd(cmd_t *);
 void erase_pipe(pipe_t *);
 void sig_handler(int);
 void psig_handler(int);
+//void print_job(job_t []);
 
 #endif
