@@ -9,11 +9,11 @@
 extern job_t jobs[MAX_JOBS];
 extern int jobcnt;
 
-int execute(char *line) {
+int execute(char *line, int size) {
     job_t *job = &jobs[jobcnt];
     pipe_t *pip;
     int *pid = job->pid; // pointer to pid array
-    int res = parse_pipe(line, &pip);
+    int res = parse_pipe(line, &pip, size);
     int prev = 0;
     if (res != SU_FLAG) {
         erase_pipe(pip);
@@ -66,7 +66,7 @@ int main() {
         strncpy(jobs[jobcnt].name, line, strlen(line)); // backup
         strncpy(s, line, strlen(line)); // ready for unfinished command
         sep_redir(line);
-        while ((res = not_finished(line)) == 1) {
+        while ((res = finish_check(line)) == WAIT_CMD) {
             printf("> ");
             fflush(stdout);
             if (fgets(line, MAX_LEN, stdin) == NULL) break;
@@ -76,12 +76,12 @@ int main() {
             strncpy(line, s, strlen(s)); // copy s to line
         }
         
-        if (res == -1) { // pipe error
+        if (res == PIPE_ERROR) { // pipe error
             pipe_error();
             continue;
         }
         
-        int flag = execute(line);
+        int flag = execute(line, res + 1);
 
         switch (flag) {
             case SU_FLAG: break;

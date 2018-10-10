@@ -29,6 +29,9 @@
 #define IN_FILE 1
 #define OUT_FILE 2
 
+#define PIPE_ERROR -1
+#define WAIT_CMD -2
+
 #define DONE 0
 #define RUNNING 1
 
@@ -55,11 +58,10 @@ typedef struct job_t {
 void shell_prompt();
 void terminate();
 void pipe_error();
-int  not_finished(char *);
+int  finish_check(char *);
 void sep_redir(char *);
 int  parse_cmd(char *, cmd_t **);
-int  parse_pipe(char *, pipe_t **);
-int  get_pipesize(char *);
+int  parse_pipe(char *, pipe_t **, int);
 int  exec_cmd(cmd_t *, int, int);
 int  builtin_cmd(cmd_t *);
 void erase_pipe(pipe_t *);

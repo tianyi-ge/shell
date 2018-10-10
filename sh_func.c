@@ -19,9 +19,10 @@ void pipe_error() {
     printf("mumsh: syntax error near unexpected token `|'\n");
 }
 
-int not_finished(char *s) {
+int finish_check(char *s) {
     int waitForFile = 0, waitForPipe = -1;
     char *send = s + strlen(s), *next;
+    int pipesize = 0;
     while (s < send) {
         s += strspn(s, " \t\r\n");
         if (s >= send) break;
@@ -41,9 +42,10 @@ int not_finished(char *s) {
             next = strchr(s, *(s-1));
         }
         else if (*s == '|'){
-            if (waitForFile) return -1; // error
-            if (waitForPipe) return -1; // error
+            if (waitForFile) return PIPE_ERROR; // error
+            if (waitForPipe) return PIPE_ERROR; // error
             waitForPipe = 1;
+            pipesize++;
             s++;
             continue;
         }
@@ -52,38 +54,43 @@ int not_finished(char *s) {
         }
 
         if (next == NULL) { //wait for parenthese input
-            return 1;
+            return WAIT_CMD;
         }
         waitForFile = 0; // if reaches here, must be valid
         waitForPipe = 0;
         s = next + 1;
     }
-    if (waitForFile || waitForPipe == 1) return 1;
+    if (waitForFile || waitForPipe == 1) return WAIT_CMD;
 
-    return 0;
+    return pipesize;
 }
 
 void sep_redir(char *s) {
     char backup[MAX_LEN];
-    int i = 0, j = 0, flag_single = 0, flag_double = 0;
+    int i = 0, j = 0, k = 0;
     if (s[strlen(s) - 1] == '\n') s[strlen(s) - 1] = '\0'; //get rid of the last '\n'
     while(s[i] != '\0') {
-        if (flag_single || flag_double) {backup[j++] = s[i++]; continue;} // unfinished quotes
-        if (s[i] == '>' && s[i+1] == '>') {
+        if (s[i] == '\'' || s[i] == '\"') {
+            if (s[i] == '\'') k = i + 1 + strcspn(s + i + 1, "\'"); // from the character after s[i]
+            else if (s[i] == '\"') k = i + 1 + strcspn(s + i + 1, "\"");
+            while (i <= k) backup[j++] = s[i++]; // the contents amid quotes
+            continue;
+        }
+        else if (s[i] == '>' && s[i+1] == '>') {
             backup[j++] = ' ';
             backup[j++] = '>';
             backup[j++] = '>';
             backup[j++] = ' ';
             i += 2;
+            continue;
         }
         else if (s[i] == '>' || s[i] == '<' || s[i] == '|' || s[i] == '&') {
             backup[j++] = ' ';
             backup[j++] = s[i++];
             backup[j++] = ' ';
+            continue;
         }
         else {
-            if (s[i] == '\'') flag_single ^= 1;
-            if (s[i] == '\"') flag_double ^= 1;
             backup[j++] = s[i++];
         }
     }
@@ -125,11 +132,7 @@ int parse_cmd(char *s, cmd_t **cmd) {
         else {
             next = s + strcspn(s, " \t\r\n");
         }
-
-        if (next == NULL) { 
-            //wait for parenthese input
-            return 0;
-        }
+        // if (next == NULL) return 0; //wait for parenthese input
         *next = '\0';
         if (waitForFile == IN_FILE) {
             (*cmd)->infile = s;
@@ -144,10 +147,8 @@ int parse_cmd(char *s, cmd_t **cmd) {
         }
         s = next + 1;
     }
-    if (waitForFile) {
-        //no file, error
-        return 0;
-    }
+    //if (waitForFile) return 0;
+
     (*cmd)->argv[cnt] = NULL;
     if (cnt > 0 && (*cmd)->argv[cnt-1][0] == '&') {
         (*cmd)->argv[--cnt] = NULL;
@@ -156,26 +157,29 @@ int parse_cmd(char *s, cmd_t **cmd) {
     return 0;
 }
 
-int parse_pipe(char *s, pipe_t **pip) {
-    int size = get_pipesize(s) + 1;
+int parse_pipe(char *s, pipe_t **pip, int size) {
     *pip = (pipe_t *)calloc(1, sizeof(pipe_t));
     (*pip)->cmds = (cmd_t **)calloc(size+1, sizeof(cmd_t *));
     (*pip)->cmds[size] = NULL;
     (*pip)->size = size;
 
-    //char *token = NULL;
     char *words[MAX_LEN];
     int cnt = 0;
-    //for (token = strtok(s, "|"); token != NULL; token = strtok(NULL, "|")) {printf("[!]\n");words[cnt++] = token;}
-    
-    char *send = s + strlen(s);
-    char *next = NULL;
+    char *send = s + strlen(s), *beg = s;
     do {
-        next = s + strcspn(s, "|");
-        *next = '\0';
-        words[cnt++] = s;
-        s = next + 1;
+        if (*s == '\'' || *s == '\"') {
+            s++;
+            s = strchr(s, *(s-1)) + 1;
+            continue;
+        }
+        if (*s == '|') {
+            *s = '\0';
+            words[cnt++] = beg;
+            beg = s + 1;
+        }
+        s++;
     } while (s < send);
+    words[cnt++] = beg;
 
     int is_bg = 0;
     for (int i = 0; i < size; ++i){
@@ -187,13 +191,6 @@ int parse_pipe(char *s, pipe_t **pip) {
     }
     (*pip)->is_bg = is_bg;
     return SU_FLAG;
-}
-
-int get_pipesize(char *line) {
-    char *tmp = line;
-    int size = 0;
-    while (*tmp != '\0') if (*(tmp++) == '|') size++;
-    return size;
 }
 
 int exec_cmd(cmd_t *cmd, int in, int out) {
