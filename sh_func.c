@@ -120,6 +120,20 @@ void sep_redir(char *s) {
     s[j] = '\0';
 }
 
+void parse_quotes(char *s, char *send) {
+    char *ptr = s, *next = NULL;
+    while (ptr < send) {
+        if (*ptr == '\'' || *ptr == '\"') {
+            ptr++;
+            next = strchr(ptr, *(ptr-1));
+            while (ptr < next) *(s++) = *(ptr++);
+            ptr++; next++; continue;
+        }
+        *(s++) = *(ptr++);
+    }
+    *s = '\0';
+}
+
 int parse_cmd(char *s, cmd_t **cmd) {
     *cmd = (cmd_t *)calloc(1, sizeof(cmd_t));
     int cnt = 0, waitForFile = 0;
@@ -150,15 +164,21 @@ int parse_cmd(char *s, cmd_t **cmd) {
             s++;
             continue;
         }
-        else if (*s == '\'' || *s == '\"') {
-            s++;
-            next = strchr(s, *(s-1));
-        }
         else {
-            next = s + strcspn(s, " \t\r\n");
+            next = s;
+            while ((*next) != ' ' && (*next) != '\t' && (*next) != '\r' && (*next) != '\n' && (*next) != '\0') {
+                if (*next == '\'' || *next == '\"') {
+                    next++;
+                    next = strchr(next, *(next-1)) + 1;
+                }
+                else {
+                    next = s + strcspn(s, " \t\r\n");
+                    break;
+                }
+            }
+            parse_quotes(s, next);
         }
-        // if (next == NULL) return 0; //wait for parenthese input
-        *next = '\0';
+        
         if (waitForFile == IN_FILE) {
             (*cmd)->infile = s;
             waitForFile = 0;
@@ -172,7 +192,6 @@ int parse_cmd(char *s, cmd_t **cmd) {
         }
         s = next + 1;
     }
-    //if (waitForFile) return 0;
 
     (*cmd)->argv[cnt] = NULL;
     if (cnt > 0 && (*cmd)->argv[cnt-1][0] == '&') {

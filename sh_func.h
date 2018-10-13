@@ -69,6 +69,7 @@ void redir_error(char *);
 void dup_error(int);
 int  finish_check(char *);
 void sep_redir(char *);
+void parse_quotes(char *, char *);
 int  parse_cmd(char *, cmd_t **);
 int  parse_pipe(char *, pipe_t **, int);
 int  exec_cmd(cmd_t *, int, int);
