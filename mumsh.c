@@ -16,10 +16,27 @@ int execute(char *line, int size) {
     int res = parse_pipe(line, &pip, size);
     int prev = 0;
     if (res != SU_FLAG) {
+        int f = pip->cmds[0]->flag;
         erase_pipe(pip);
-        if (res == EM_FLAG) return EM_FLAG;
-        else { // ER_FLAG
+        if (res == EM_FLAG) {
+            if (f) {
+                miss_error();
+                return ER_FLAG;
+            }
+            return EM_FLAG;
+        }
+        else if (res == ER_FLAG) {
             pipe_error(); return ER_FLAG;
+        }
+        else { //DP_FLAG
+            return ER_FLAG;
+        }
+    }
+    for (int i = 1; i < pip->size; ++i) {
+        if (pip->cmds[i]->argv[0] == NULL && pip->cmds[i]->flag) {
+            miss_error();
+            erase_pipe(pip);
+            return ER_FLAG;
         }
     }
     jobs[jobcnt].status = RUNNING;
@@ -31,9 +48,30 @@ int execute(char *line, int size) {
         if (i == pip->size - 1) out = -1;
 
         //redirection
-        if (pip->cmds[i]->flag & OUT_APPEND) out = open(pip->cmds[i]->outfile, FLAGS_AP, MODE);
-        if (pip->cmds[i]->flag & OUT_REDIR) out = open(pip->cmds[i]->outfile, FLAGS_WR, MODE);
-        if (pip->cmds[i]->flag & IN_REDIR) in = open(pip->cmds[i]->infile, FLAGS_RD, MODE);
+        if (pip->cmds[i]->flag & OUT_APPEND) {
+            out = open(pip->cmds[i]->outfile, FLAGS_AP, MODE);
+            if (out == -1) {
+                printf("%s: Permission denied\n", pip->cmds[i]->outfile);
+                erase_pipe(pip);
+                return ER_FLAG;
+            }
+        }
+        if (pip->cmds[i]->flag & OUT_REDIR) {
+            out = open(pip->cmds[i]->outfile, FLAGS_WR, MODE);
+            if (out == -1) {
+                printf("%s: Permission denied\n", pip->cmds[i]->outfile);
+                erase_pipe(pip);
+                return ER_FLAG;
+            }
+        }
+        if (pip->cmds[i]->flag & IN_REDIR) {
+            in = open(pip->cmds[i]->infile, FLAGS_RD, MODE);
+            if (in == -1) {
+                printf("%s: No such file or directory\n", pip->cmds[i]->infile);
+                erase_pipe(pip);
+                return ER_FLAG;
+            }
+        }
         pid[i] = exec_cmd(pip->cmds[i], in, out);
         prev = fd[0];
     }
@@ -80,7 +118,14 @@ int main() {
             pipe_error();
             continue;
         }
+
+        if (res == MISS_ERROR) {
+            miss_error();
+            continue;
+        }
         
+        if (res == REDIR_ERROR) continue;
+
         int flag = execute(line, res + 1);
 
         switch (flag) {

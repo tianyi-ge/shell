@@ -16,7 +16,20 @@ void terminate() {
 }
 
 void pipe_error() {
-    printf("mumsh: syntax error near unexpected token `|'\n");
+    printf("syntax error near unexpected token `|'\n");
+}
+
+void redir_error(char *s) {
+    printf("syntax error near unexpected token `%s'\n", s);
+}
+
+void miss_error() {
+    printf("error: missing program\n");
+}
+
+void dup_error(int is_dup) {
+    if (is_dup == DUP_IN_ERROR) printf("error: duplicated input redirection\n");
+    else if (is_dup == DUP_OUT_ERROR) printf("error: duplicated output redirection\n");
 }
 
 int finish_check(char *s) {
@@ -28,11 +41,20 @@ int finish_check(char *s) {
         if (s >= send) break;
 
         if (*s == '>' && *(s+1) == '>') { //safe to check s+1 because of '\0'
+            if (waitForFile) {
+                redir_error(">>");
+                return REDIR_ERROR;
+            }
             waitForFile = 1;
             s += 2;
             continue;
         }
         else if (*s == '>' || *s == '<') {
+            if (waitForFile) {
+                if (*s == '>') redir_error(">");
+                else redir_error("<");
+                return REDIR_ERROR;
+            }
             waitForFile = 1;
             s++;
             continue;
@@ -43,7 +65,7 @@ int finish_check(char *s) {
         }
         else if (*s == '|'){
             if (waitForFile) return PIPE_ERROR; // error
-            if (waitForPipe) return PIPE_ERROR; // error
+            if (waitForPipe) return MISS_ERROR; // error
             waitForPipe = 1;
             pipesize++;
             s++;
@@ -108,18 +130,21 @@ int parse_cmd(char *s, cmd_t **cmd) {
         if (s >= send) break;
 
         if (*s == '>' && *(s+1) == '>') { //safe to check s+1 because of '\0'
+            if (((*cmd)->flag & OUT_APPEND) || ((*cmd)->flag & OUT_REDIR)) return DUP_OUT_ERROR;
             (*cmd)->flag |= OUT_APPEND;
             waitForFile = OUT_FILE;
             s += 2;
             continue;
         }
-        else if (*s == '>') { 
+        else if (*s == '>') {
+            if (((*cmd)->flag & OUT_APPEND) || ((*cmd)->flag & OUT_REDIR)) return DUP_OUT_ERROR;
             (*cmd)->flag |= OUT_REDIR;
             waitForFile = OUT_FILE;
             s++;
             continue;
         }
         else if (*s == '<') {
+            if ((*cmd)->flag & IN_REDIR) return DUP_IN_ERROR;
             (*cmd)->flag |= IN_REDIR;
             waitForFile = IN_FILE;
             s++;
@@ -181,14 +206,25 @@ int parse_pipe(char *s, pipe_t **pip, int size) {
     } while (s < send);
     words[cnt++] = beg;
 
-    int is_bg = 0;
+    int is_bg = 0, is_dup = 0;
     for (int i = 0; i < size; ++i){
         is_bg = parse_cmd(words[i], &(*pip)->cmds[i]);
+        if (is_bg < 0) is_dup = is_bg; // duplicated
+        if (size != 1) {
+            if ((((*pip)->cmds[i]->flag & OUT_APPEND) || ((*pip)->cmds[i]->flag & OUT_REDIR)) && (i != size - 1)) is_dup = DUP_OUT_ERROR;
+            if (((*pip)->cmds[i]->flag & IN_REDIR) && (i != 0)) is_dup = DUP_IN_ERROR;
+        }
+
         if ((*pip)->cmds[i]->argv[0] == NULL) {
             if (i == 0 && size == 1)  return EM_FLAG; // empty command
             else return ER_FLAG; // empty command in the middle
         }
     }
+    if (is_dup) {
+        dup_error(is_dup);
+        return DP_FLAG;
+    }
+
     (*pip)->is_bg = is_bg;
     return SU_FLAG;
 }
@@ -243,10 +279,10 @@ int builtin_cmd(cmd_t *cmd) {
 
     if (strcmp(cmd->argv[0], "cd") == 0) {
         if (cmd->argv[2]) {
-            printf("mumsh: cd: too many arguments\n");
+            printf("cd: too many arguments\n");
             return 1;
         }
-        if (chdir(cmd->argv[1]) == -1) printf("mumsh: cd: %s: No such file or directory\n", cmd->argv[1]);
+        if (chdir(cmd->argv[1]) == -1) printf("%s: No such file or directory\n", cmd->argv[1]);
         return 1;
     }
     return 0;
@@ -276,8 +312,10 @@ void psig_handler(int sig) {
 
 void print_job(int jid) {
     printf("[%d] ", jid);
+    /*
     for (int i = 0; i < jobs[jid].pcnt; ++i)
         printf("(%d) ", jobs[jid].pid[i]);
+    */
     printf("%s", jobs[jid].name);
 }
 

@@ -19,18 +19,24 @@
 #define OUT_APPEND 4
 #define FLAGS_WR O_WRONLY | O_CREAT | O_TRUNC
 #define FLAGS_AP O_WRONLY | O_APPEND | O_CREAT
-#define FLAGS_RD O_RDONLY | O_CREAT
+#define FLAGS_RD O_RDONLY
 #define MODE 0666
 
 #define SU_FLAG 0
 #define ER_FLAG 1
 #define EM_FLAG 2 
+#define DP_FLAG 3 
 
 #define IN_FILE 1
 #define OUT_FILE 2
 
 #define PIPE_ERROR -1
 #define WAIT_CMD -2
+#define MISS_ERROR -3
+#define REDIR_ERROR -4
+
+#define DUP_IN_ERROR -1
+#define DUP_OUT_ERROR -2
 
 #define DONE 0
 #define RUNNING 1
@@ -58,6 +64,9 @@ typedef struct job_t {
 void shell_prompt();
 void terminate();
 void pipe_error();
+void miss_error();
+void redir_error(char *);
+void dup_error(int);
 int  finish_check(char *);
 void sep_redir(char *);
 int  parse_cmd(char *, cmd_t **);
